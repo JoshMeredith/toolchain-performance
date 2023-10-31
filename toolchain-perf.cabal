@@ -28,5 +28,7 @@ executable toolchain-perf
 		    , cassava
 		    , list-t
 		    , bytestring
+                    , directory
+                    , clock
     hs-source-dirs:   app
     default-language: Haskell2010

@@ -6,14 +6,15 @@
 module Main where
 
 import Turtle.Prelude
-import Data.Time.Clock
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Text
+import Data.Text as T
 import Data.Csv
 import ListT
 import GHC.IO.Exception
 import Data.ByteString.Lazy as BL
+import System.Directory
+import System.Clock
 
 -- ----------------------------------------------------------------------------
 -- Options
@@ -40,13 +41,18 @@ ghcVersions = fromFoldable
 -- Test
 -- ----------------------------------------------------------------------------
   
-runTest :: Text -> Text -> ListT IO (NominalDiffTime, ExitCode)
+runTest :: Text -> Text -> ListT IO (TimeSpec, ExitCode)
 runTest v o = do
   cleanup
-  measureTime $ proc (ghcPathFor v) ["Hello.hs", o] mempty
+  measureTime $ proc (ghcPathFor v) ["-v0", "-fforce-recomp", "Hello.hs", o] mempty
 
 cleanup :: MonadIO m => m ()
-cleanup = void $ proc "rm" ["Hello.hi", "Hello.o", "Hello"] mempty
+cleanup = liftIO $ forM_ ["Hello.hi", "Hello.o", "Hello"] removeFile'
+
+removeFile' :: MonadIO m => FilePath -> m ()
+removeFile' f = liftIO $ doesFileExist f >>= \case
+  True  -> removeFile f
+  False -> return ()
 
 -- ----------------------------------------------------------------------------
 -- Script
@@ -54,12 +60,16 @@ cleanup = void $ proc "rm" ["Hello.hi", "Hello.o", "Hello"] mempty
 
 main :: IO ()
 main = do
-  runs :: [[String]] <- toList do
+  setCurrentDirectory "tests/hello"
+  removeFile' "runs.csv"
+  runs :: [[Text]] <- toList do
     v <- ghcVersions
     o <- oFlags
     liftIO $ print (v, o)
     fmap snd (runTest v o) >>= \case
-      ExitSuccess -> replicateM 10 (show . (* 1000) . nominalDiffTimeToSeconds . fst <$> runTest v o)
+      ExitSuccess -> do
+        xs <- replicateM 10 (T.pack . show . toNanoSecs . fst <$> runTest v o)
+        pure (v:o:xs)
       ExitFailure _ -> return []
   cleanup
   BL.writeFile "runs.csv" (encode runs)
@@ -67,9 +77,10 @@ main = do
 ghcPathFor :: Text -> Text
 ghcPathFor version = "ghc-" <> version
 
-measureTime :: MonadIO m => m a -> m (NominalDiffTime, a)
+measureTime :: MonadIO m => m a -> m (TimeSpec, a)
 measureTime m = do
-  t1 <- liftIO getCurrentTime
+  let get_time = liftIO (getTime ProcessCPUTime) 
+  t1 <- get_time
   x <- m
-  t2 <- liftIO getCurrentTime
-  return (t2 `diffUTCTime` t1, x)
+  t2 <- get_time
+  return (t2 `diffTimeSpec` t1, x)
