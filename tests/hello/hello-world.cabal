@@ -1,0 +1,7 @@
+cabal-version: 3.0
+name: hello-world
+version: 1.0.0
+
+executable hello-world
+    main-is:       Hello.hs
+    build-depends: base

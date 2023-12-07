@@ -13,22 +13,40 @@ build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
-common warnings
+common all
     ghc-options: -Wall
-
-executable toolchain-perf
-    import:           warnings
-    main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
-    build-depends:    base ^>=4.17.0.0
+    build-depends:    base <= 5.0
                     , turtle
-		    , time
-		    , text
-		    , cassava
-		    , list-t
-		    , bytestring
+                    , time
+                    , text
+                    , cassava
+                    , list-t
+                    , bytestring
                     , directory
                     , clock
+                    , dhall
+                    , mtl
+                    , containers
+                    , transformers
+                    , monad-control
+		    , data-default-class
+		    , Chart
+		    , Chart-diagrams
+		    , lens
+		    , statistics
+		    , vector
+
+executable toolchain-perf
+    import:           all
+    main-is:          Main.hs
+    build-depends:    toolchain-perf
     hs-source-dirs:   app
     default-language: Haskell2010
+
+library
+    import:           all
+    hs-source-dirs:   src
+    default-language: Haskell2010
+    exposed-modules:  ToolchainPerf
+                    , ToolchainPerf.Graph
+                    , ToolchainPerf.Types

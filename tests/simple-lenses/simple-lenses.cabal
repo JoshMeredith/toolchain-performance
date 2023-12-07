@@ -1,0 +1,13 @@
+cabal-version: 3.0
+name: simple-lenses
+version: 1.0.0
+
+executable simple-lenses
+    main-is:       SimpleLenses.hs
+    build-depends: base,
+                   lens == 5.2.3
+
+executable baseline
+    main-is:       Baseline.hs
+    build-depends: base,
+                   lens == 5.2.3

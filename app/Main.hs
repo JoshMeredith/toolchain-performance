@@ -5,54 +5,127 @@
 
 module Main where
 
-import Turtle.Prelude
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.Text as T
-import Data.Csv
-import ListT
-import GHC.IO.Exception
-import Data.ByteString.Lazy as BL
-import System.Directory
-import System.Clock
+import Data.Text hiding (map)
+
+import ToolchainPerf
+import ToolchainPerf.Graph
 
 -- ----------------------------------------------------------------------------
 -- Options
 -- ----------------------------------------------------------------------------
 
-oFlags :: Monad m => ListT m Text
-oFlags = fromFoldable
+oFlags :: TestVariable
+oFlags = ToolFlag ToolGhc "-O"
   [ "-O1"
   , "-O2"
   , "-O3"
   ]
 
-ghcVersions :: Monad m => ListT m Text
-ghcVersions = fromFoldable
-  [ "8.10.7"
-  , "9.0.2"
-  , "9.2.8"
-  , "9.4.7"
-  , "9.6.3"
-  , "9.8.1"
+ghcSystem :: TestVariable
+ghcSystem = ToolVersion ToolGhc
+  [ "ghc" ]
+
+ghcVersions :: TestVariable
+ghcVersions = ToolVersion ToolGhc
+  [ "ghc-8.10.7"
+  , "ghc-9.0.2"
+  , "ghc-9.2.8"
+  , "ghc-9.4.7"
+  , "ghc-9.6.3"
+  , "ghc-9.8.1"
+  ]
+
+cabalSystem :: TestVariable
+cabalSystem = ToolVersion ToolCabal
+  [ "cabal" ]
+
+cabalVersions :: TestVariable
+cabalVersions = ToolVersion ToolCabal
+  [ "cabal-3.6.2.0"
+  , "cabal-3.8.1.0"
+  , "cabal-3.10.2.0"
   ]
 
 -- ----------------------------------------------------------------------------
--- Test
+-- [GHC] Build Hello World
 -- ----------------------------------------------------------------------------
-  
-runTest :: Text -> Text -> ListT IO (TimeSpec, ExitCode)
-runTest v o = do
-  cleanup
-  measureTime $ proc (ghcPathFor v) ["-v0", "-fforce-recomp", "Hello.hs", o] mempty
 
-cleanup :: MonadIO m => m ()
-cleanup = liftIO $ forM_ ["Hello.hi", "Hello.o", "Hello"] removeFile'
+ghc_build_helloWorld :: PerfTest
+ghc_build_helloWorld = TestMatrix
+  "tests/hello"
+  ToolGhc
+  [ "Hello.hs" ]
+  [ ghcVersions
+  , oFlags
+  ]
 
-removeFile' :: MonadIO m => FilePath -> m ()
-removeFile' f = liftIO $ doesFileExist f >>= \case
-  True  -> removeFile f
-  False -> return ()
+-- ----------------------------------------------------------------------------
+-- [System GHC, Cabal]: Build Hello World
+-- ----------------------------------------------------------------------------
+
+cabal_build_helloWorld :: PerfTest
+cabal_build_helloWorld = TestMatrix
+  "tests/hello"
+  ToolCabal
+  [ "build", "hello-world" ]
+  [ ghcSystem
+  , cabalVersions
+  ]
+
+-- ----------------------------------------------------------------------------
+-- [Cabal, GHC] Build Cabal
+-- ----------------------------------------------------------------------------
+
+cabal_build_cabal :: PerfTest
+cabal_build_cabal = TestMatrix
+  "tests/cabal/cabal"
+  ToolCabal
+  [ "build", "Cabal" ]
+  [ ghcVersions
+  , cabalVersions
+  ]
+
+-- ----------------------------------------------------------------------------
+-- [System Cabal, GHC] Build Simple Lenses
+-- ----------------------------------------------------------------------------
+
+cabal_build_simpleLenses_baseline :: PerfTest
+cabal_build_simpleLenses_baseline = cabal_build_simpleLenses' "baseline"
+
+cabal_build_simpleLenses_lenses :: PerfTest
+cabal_build_simpleLenses_lenses = cabal_build_simpleLenses' "simple-lenses"
+
+cabal_build_simpleLenses :: PerfTest
+cabal_build_simpleLenses = TestName
+  [ "baseline" $> cabal_build_simpleLenses_baseline
+  , "lenses"   $> cabal_build_simpleLenses_lenses
+  ]
+
+cabal_build_simpleLenses' :: Text -> PerfTest
+cabal_build_simpleLenses' target = TestMatrix
+  "tests/simple-lenses"
+  ToolCabal
+  [ "build", target ]
+  [ cabalSystem
+  , ghcVersions
+  , oFlags
+  ]
+
+-- ----------------------------------------------------------------------------
+-- Tests
+-- ----------------------------------------------------------------------------
+
+infixr 1 $>
+
+($>) :: a -> b -> (a, b)
+($>) = (,)
+
+tests :: PerfTest
+tests = TestName
+  [ "GHC build Hello World" $> ghc_build_helloWorld
+  --, "Cabal build Cabal"     $> cabal_build_cabal
+  --, "Simple lenses (TH)"    $> cabal_build_simpleLenses
+  ]
 
 -- ----------------------------------------------------------------------------
 -- Script
@@ -60,27 +133,10 @@ removeFile' f = liftIO $ doesFileExist f >>= \case
 
 main :: IO ()
 main = do
-  setCurrentDirectory "tests/hello"
-  removeFile' "runs.csv"
-  runs :: [[Text]] <- toList do
-    v <- ghcVersions
-    o <- oFlags
-    liftIO $ print (v, o)
-    fmap snd (runTest v o) >>= \case
-      ExitSuccess -> do
-        xs <- replicateM 10 (T.pack . show . toNanoSecs . fst <$> runTest v o)
-        pure (v:o:xs)
-      ExitFailure _ -> return []
-  cleanup
-  BL.writeFile "runs.csv" (encode runs)
+  -- tests <- input auto "./tests/tests.dhall"
+  go [] =<< runPerfR (runPerfTest tests)
 
-ghcPathFor :: Text -> Text
-ghcPathFor version = "ghc-" <> version
-
-measureTime :: MonadIO m => m a -> m (TimeSpec, a)
-measureTime m = do
-  let get_time = liftIO (getTime ProcessCPUTime) 
-  t1 <- get_time
-  x <- m
-  t2 <- get_time
-  return (t2 `diffTimeSpec` t1, x)
+  where
+    go names = \case
+      ResultsName ns -> mapM_ (\(n, r) -> go (names ++ [n]) r) ns
+      PerfResults args results -> graphPerfToFile names args results
