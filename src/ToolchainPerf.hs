@@ -49,7 +49,7 @@ runPerfTest (TestName ts) = ResultsName <$> forM ts \(n, t) -> do
 
 runPerfTest (TestMatrix dir cmd args vs) = control \runInBase ->
   withCurrentDirectory dir $ runInBase do
-    PerfResults (matrixHeader vs) <$> runMatrix 1 vs cmd args
+    PerfResults (matrixHeader vs) <$> runMatrix 10 vs cmd args
 
 
 matrixHeader :: [TestVariable] -> [Text]
@@ -69,24 +69,24 @@ runMatrix
   -> [TestVariable]
   -> ToolCommand
   -> [Text]
-  -> m [([Text], [TimeSpec])]
-runMatrix n vars cmd cmdArgs = toList $ go [] vars
+  -> m [([Text], [Text], [TimeSpec])]
+runMatrix n vars cmd cmdArgs = toList $ go [] [] vars
   where
     go :: (MonadIO m, MonadReader PerfR m)
-       => [Text] -> [TestVariable] -> ListT m ([Text], [TimeSpec])
-    go args [] = invoke cmd cmdArgs >>= \case
-      Nothing -> return (args, replicate n 0)
-      Just _  -> (args,) <$> do
+       => [Text] -> [Text] -> [TestVariable] -> ListT m ([Text], [Text], [TimeSpec])
+    go tvs tfs [] = invoke cmd cmdArgs >>= \case
+      Nothing -> return (tvs, tfs, replicate n 0)
+      Just _  -> (tvs, tfs,) <$> do
         replicateM n do
           x <- invoke cmd cmdArgs
           return $ fromMaybe 0 x
-    go args (v:vs) = case v of
+    go tvss tfss (v:vs) = case v of
       ToolVersion t   tvs -> do
         tv <- fromFoldable tvs
-        local (setToolVersion t tv) $ go (args ++ [tv]) vs
+        local (setToolVersion t tv) $ go (tvss ++ [tv]) tfss vs
       ToolFlag    t _ tfs -> do
         tf <- fromFoldable tfs
-        local (addToolArg t tf) $ go (args ++ [tf]) vs
+        local (addToolArg t tf) $ go tvss (tfss ++ [tf]) vs
 
 
 setToolVersion :: ToolCommand -> Text -> PerfR -> PerfR

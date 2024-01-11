@@ -35,7 +35,7 @@ instance FromDhall PerfTest where
 
 data PerfResults
    = ResultsName [(Text, PerfResults)]
-   | PerfResults [Text] [([Text], [TimeSpec])]
+   | PerfResults [Text] [([Text], [Text], [TimeSpec])]
    deriving Show
 
 data TestVariable

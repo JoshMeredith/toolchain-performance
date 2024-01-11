@@ -9,6 +9,7 @@ import Data.Text hiding (map)
 
 import ToolchainPerf
 import ToolchainPerf.Graph
+import ToolchainPerf.IO
 
 -- ----------------------------------------------------------------------------
 -- Options
@@ -123,8 +124,8 @@ infixr 1 $>
 tests :: PerfTest
 tests = TestName
   [ "GHC build Hello World" $> ghc_build_helloWorld
-  --, "Cabal build Cabal"     $> cabal_build_cabal
-  --, "Simple lenses (TH)"    $> cabal_build_simpleLenses
+  , "Cabal build Cabal"     $> cabal_build_cabal
+  , "Simple lenses (TH)"    $> cabal_build_simpleLenses
   ]
 
 -- ----------------------------------------------------------------------------
@@ -134,9 +135,9 @@ tests = TestName
 main :: IO ()
 main = do
   -- tests <- input auto "./tests/tests.dhall"
-  go [] =<< runPerfR (runPerfTest tests)
+  savePerfResults "results/csv" =<< runPerfR (runPerfTest tests)
 
-  where
-    go names = \case
-      ResultsName ns -> mapM_ (\(n, r) -> go (names ++ [n]) r) ns
-      PerfResults args results -> graphPerfToFile names args results
+  -- where
+  --   go names = \case
+  --     ResultsName ns -> mapM_ (\(n, r) -> go (names ++ [n]) r) ns
+  --     PerfResults args results -> graphPerfToFile names args results
