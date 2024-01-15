@@ -93,12 +93,16 @@ cabal_build_cabal = TestMatrix
 cabal_build_simpleLenses_baseline :: PerfTest
 cabal_build_simpleLenses_baseline = cabal_build_simpleLenses' "baseline"
 
+cabal_build_simpleLenses_manual :: PerfTest
+cabal_build_simpleLenses_manual = cabal_build_simpleLenses' "manual"
+
 cabal_build_simpleLenses_lenses :: PerfTest
 cabal_build_simpleLenses_lenses = cabal_build_simpleLenses' "simple-lenses"
 
 cabal_build_simpleLenses :: PerfTest
 cabal_build_simpleLenses = TestName
   [ "baseline" $> cabal_build_simpleLenses_baseline
+  , "manual"   $> cabal_build_simpleLenses_manual
   , "lenses"   $> cabal_build_simpleLenses_lenses
   ]
 

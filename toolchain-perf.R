@@ -41,17 +41,21 @@ build_cabal <- function() {
 
 simple_lenses <- function() {
   data_baseline <- read.csv("./results/csv/Simple lenses (TH),baseline.csv", header = FALSE)
+  data_manual   <- read.csv("./results/csv/Simple lenses (TH),manual.csv",   header = FALSE)
   data_lenses   <- read.csv("./results/csv/Simple lenses (TH),lenses.csv",   header = FALSE)
 
   baseline <- data.frame(data_baseline, label = "Baseline")
+  manual   <- data.frame(data_manual,   label = "Hand-written lenses")
   lenses   <- data.frame(data_lenses,   label = "With lenses")
 
-  print(rbind(baseline, lenses))
+  print(rbind(baseline, manual, lenses))
 
-  ggplot(data = rbind(lenses, baseline), mapping = aes(x = V1, y = V3, fill = label)) +
+  ggplot(data = rbind(lenses, manual, baseline), mapping = aes(x = V1, y = V3, fill = label)) +
     facet_wrap(vars(V2), ncol = 1) +
-    geom_bar(data = lenses, stat = "identity", position = "dodge") +
-    geom_bar(data = baseline, stat = "identity", position = "dodge") +
+    geom_bar(stat = "identity", position = "dodge") +
+    # geom_bar(data = lenses, stat = "identity", position = "dodge") +
+    # geom_bar(data = manual, stat = "identity", position = "dodge") +
+    # geom_bar(data = baseline, stat = "identity", position = "dodge") +
     ylab("Execution time (milliseconds)") +
     xlab("Test variables") +
     labs(fill = "Lenses") +
